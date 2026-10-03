@@ -1,4 +1,4 @@
-X Reels v1.4 — one photo or video per screen
+X Reels v1.6 — one photo or video per screen
 
 ONE-TIME SETUP IN EDGE
 1. Open Tampermonkey > Dashboard > + (Create a new script).
@@ -9,11 +9,21 @@ AFTER SETUP
 Scroll down/up, swipe, or use the arrow keys to move to the next/previous media.
 There is no scroll cooldown. Faster/larger wheel movements move through more
 items, and trackpad input accumulates. One 100-pixel wheel step = one item.
+The next 10 distinct images after the current item are preloaded while Reels
+is open, skipping videos and their posters. The buffer follows your position
+and refills as X loads more media. Near the end it holds only the available
+images. Closing Reels releases the buffer; the browser manages its own cache.
 Text-only posts and captions are omitted. Videos loop and start muted.
 Images and videos now fit the full available screen width and height,
 preserving their aspect ratio. Landscape images no longer use a narrow
 portrait column. Fit is the default; the Fill button switches to cropping.
-The right navigation bar shows the loaded media total and current position.
+Bar colors: blue = current, green = image ready, amber stripes = downloading,
+gray = not preloaded or failed. Videos have a play marker. The viewer does
+not preload videos or their posters; X's underlying page may load its own
+media independently. Hover a marker for its number and status.
+The ready count, such as 8/10 ready, shows completed images in the buffer.
+The loaded media count, such as 12 / 60, shows the current position among
+known media links; it does not mean every image has already downloaded.
 Click the bar or drag its thumb to jump to any loaded item. Photos and
 videos each count as one item, including separate photos in a multi-photo
 post. The total grows as X loads more items. The bar covers loaded items,
@@ -62,10 +72,16 @@ server acceptance on your account. The updated version has not been
 verified on your signed-in X account. Background actions use X's internal
 GraphQL operations; X may change the endpoint IDs or required headers.
 The script learns newer action IDs if X makes those requests on the page.
-It also depends on X's
-current timeline response format, which may change. It reads media URLs
+Image preloading and status colors passed local tests covering downloading,
+successful and failed loads, video exclusion, buffer refill, and exit cleanup.
+Preloading uses additional bandwidth. Jumps outside the buffer, videos, and
+slow downloads can still cause a delay.
+It also depends on X's current timeline response format, which may change.
+It reads media URLs
 from timeline responses X already loads, and scrolls the original feed
 behind the viewer to load more. It does not send posts or account details
 to another service. Viewing videos/images still makes normal media requests
 to X's media servers. Search, account or sensitive-content restrictions
 still apply; there may be a wait when X has not loaded the next item.
+
+

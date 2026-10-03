@@ -1,13 +1,15 @@
 {
   "name": "x-reels-userscript",
-  "version": "1.4.0",
+  "version": "1.6.0",
   "private": true,
   "description": "A media-only Reels-style viewer for X, installed with Tampermonkey.",
   "scripts": {
     "check": "node --check x-reels.user.js",
-    "test": "node tests/viewer.cjs && node tests/layout.cjs && node tests/background-actions.cjs"
+    "test": "node tests/viewer.cjs && node tests/layout.cjs && node tests/background-actions.cjs && node tests/preload.cjs"
   },
   "devDependencies": {
     "playwright": "1.62.1"
   }
 }
+
+

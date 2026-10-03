@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         X Reels — media viewer
 // @namespace    local.codex.x-reels
-// @version      1.4.0
+// @version      1.6.0
 // @description  One photo or video per screen. Wheel, swipe or arrow keys to browse your current X feed.
 // @match        https://x.com/*
 // @match        https://twitter.com/*
@@ -61,6 +61,72 @@
   let recordingShortcut = false, wheelPixels = 0, wheelDirection = 0, wheelTime = 0, wheelFrame = 0;
   let pendingSteps = 0, manuallyPaused = false;
   const items = [], seen = new Map();
+  const IMAGE_PRELOAD_COUNT = 10;
+  const preloadedImages = new Map();
+  const preloadStates = new WeakMap();
+  function preloadImages() {
+    const upcoming = new Set();
+    if (enabled) {
+      for (let n = index + 1; n < items.length && upcoming.size < IMAGE_PRELOAD_COUNT; n++) {
+        if (items[n].type === 'image') upcoming.add(items[n].src);
+      }
+    }
+    // Keep only the next ten distinct image URLs. Never create video elements
+    // or request video posters as part of this buffer.
+    for (const [src, image] of preloadedImages) {
+      if (!upcoming.has(src)) {
+        image.removeAttribute('src');
+        preloadedImages.delete(src);
+      }
+    }
+    for (const src of upcoming) {
+      if (preloadedImages.has(src)) continue;
+      const image = new Image();
+      image.decoding = 'async';
+      preloadedImages.set(src, image);
+      preloadStates.set(image, 'loading');
+      const finished = state => {
+        if (preloadedImages.get(src) !== image) return;
+        preloadStates.set(image, state);
+        updatePreloadMarkers();
+      };
+      image.onload = () => finished(image.naturalWidth > 0 ? 'ready' : 'error');
+      image.onerror = () => finished('error');
+      image.src = src;
+    }
+    updatePreloadMarkers();
+  }
+  function updatePreloadMarkers() {
+    if (!root) return;
+    const markers = root.querySelector('.markers');
+    if (!markers) return;
+    if (markers.children.length !== items.length) {
+      const fragment = document.createDocumentFragment();
+      for (let n = 0; n < items.length; n++) {
+        const marker = document.createElement('span');
+        marker.className = 'media-marker';
+        marker.style.top = `${items.length > 1 ? n / (items.length - 1) * 100 : 0}%`;
+        fragment.append(marker);
+      }
+      markers.replaceChildren(fragment);
+      markers.style.setProperty('--item-count', Math.max(1, items.length));
+    }
+    for (let n = 0; n < items.length; n++) {
+      const item = items[n], image = item.type === 'image' && preloadedImages.get(item.src);
+      const state = n === index ? 'current' : (image && preloadStates.get(image)) || 'idle';
+      const marker = markers.children[n];
+      marker.dataset.state = state;
+      marker.dataset.type = item.type;
+      const label = state === 'current' ? 'Current item' : state === 'ready' ? 'Image ready' :
+        state === 'loading' ? 'Image loading' : state === 'error' ? 'Image preload failed' :
+        item.type === 'video' ? 'Video (not preloaded)' : 'Image not preloaded';
+      marker.title = `${n + 1}: ${label}`;
+    }
+    const ready = [...preloadedImages.values()].filter(image => preloadStates.get(image) === 'ready').length;
+    const summary = root.querySelector('.preload-summary');
+    summary.textContent = `${ready}/${preloadedImages.size} ready`;
+    summary.title = 'Blue: current · Green: image ready · Amber: loading · Gray: not preloaded or failed. Videos are not preloaded.';
+  }
   let host, root, stage, status, launcher, index = 0;
   let enabled = false, muted = true, contain = true;
   let dragPointer = null, dragFrame = 0, dragFraction = 0;
@@ -120,6 +186,7 @@
       }
       else if (!stage.firstElementChild) render();
       updateStatus();
+      preloadImages();
     }
   }
   const timeline = url => /\/graphql\/.*\/(HomeTimeline|HomeLatestTimeline|SearchTimeline|UserTweets|UserMedia|UserTweetsAndReplies|ListLatestTweets)(\?|$)/.test(String(url));
@@ -234,6 +301,7 @@
     track.setAttribute('aria-valuetext', items.length ? `Item ${index + 1} of ${items.length} loaded` : 'No media loaded yet');
     track.setAttribute('aria-disabled', String(!items.length));
     track.tabIndex = items.length ? 0 : -1;
+    updatePreloadMarkers();
   }
   function jumpTo(next) {
     if (!items.length) return;
@@ -296,6 +364,7 @@
       }
     });
     updateStatus(); misses = 0;
+    preloadImages();
   }
   function message(text) {
     let note = root.querySelector('.notice');
@@ -348,6 +417,7 @@
       if (!items.length) message('Waiting for X media. If this stays empty, refresh X once.');
       misses = 0; lastPump = -Infinity; pump(); loader = setInterval(pump, 800);
     } else {
+      preloadImages();
       clearInterval(loader); loader = null; pendingSteps = 0;
       const video = stage.querySelector('video');
       if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
@@ -425,20 +495,27 @@
       .loaded{padding-top:17px;text-align:center;font-size:11px;color:#9aa6b8;line-height:1.5}
       .loaded-total{display:block;font-size:22px;line-height:1.2;color:#fff;font-weight:650}
       .count{font-size:12px;padding:5px 8px;margin-top:7px;cursor:default;white-space:nowrap}
-      .track{position:absolute;top:135px;bottom:110px;width:34px;cursor:pointer;touch-action:none;--position:0%}
+      .preload-summary{margin-top:5px;font-size:10px;color:#aab7c8;white-space:nowrap}
+      .track{position:absolute;top:145px;bottom:110px;width:34px;cursor:pointer;touch-action:none;--position:0%}
       .track:before{content:'';position:absolute;top:0;bottom:0;left:11px;width:12px;border:1px solid #394555;background:#252d39;border-radius:12px}
+      .markers{position:absolute;inset:0}
+      .media-marker{position:absolute;left:50%;transform:translate(-50%,-50%);width:14px;height:min(8px,calc(80% / var(--item-count)));min-height:1px;border-radius:2px;background:#596575}
+      .media-marker[data-state=ready]{background:#34d36a;z-index:1}
+      .media-marker[data-state=loading]{background:repeating-linear-gradient(135deg,#f6c549 0 3px,#957019 3px 5px);z-index:1}
+      .media-marker[data-state=current]{background:#39b9ff;z-index:2}
+      .media-marker[data-type=video]:after{content:'';position:absolute;left:5px;top:50%;transform:translateY(-50%);border-left:4px solid #e7edf5;border-top:2px solid transparent;border-bottom:2px solid transparent}
       .track:focus-visible{outline:2px solid #8bdcff;outline-offset:6px;border-radius:10px}
-      .thumb{position:absolute;top:var(--position);left:50%;transform:translate(-50%,-50%);width:24px;height:30px;border-radius:8px;background:#7dd5ff;box-shadow:0 0 0 4px #162936;cursor:grab}
+      .thumb{position:absolute;top:var(--position);left:50%;transform:translate(-50%,-50%);width:24px;height:18px;border-radius:5px;background:#39b9ff;border:2px solid #edf8ff;box-shadow:0 0 0 3px #162936;cursor:grab;z-index:3}
       .track:active .thumb{cursor:grabbing}
       .track[aria-disabled=true]{opacity:.4;cursor:default}
-      .first-item,.last-item{position:absolute;font-size:12px;color:#8592a5}.first-item{top:110px}.last-item{bottom:76px}
+      .first-item,.last-item{position:absolute;font-size:12px;color:#8592a5}.first-item{top:123px}.last-item{bottom:76px}
       .arrows{position:absolute;bottom:18px;display:flex;gap:5px}.arrows button{padding:7px 10px}
       @media(max-width:600px){.viewer{--rail-width:64px}.stage{left:4px;right:68px;top:106px;bottom:64px}.bar{top:8px;left:4px;right:72px;gap:4px}.bar button{padding:7px 9px}.count{font-size:10px;padding:4px}.loaded-total{font-size:19px}.actions{left:4px;bottom:14px;gap:4px}.actions button{padding:8px;font-size:11px}.arrows button{padding:6px 8px}}
       @media(max-height:420px){.track{top:112px;bottom:80px}.first-item{top:90px}.last-item{bottom:52px}.arrows{bottom:10px}.loaded{padding-top:10px}.stage{top:56px;bottom:56px}}
     </style><div class="viewer"><div class="stage"></div>
       <div class="bar"><button class="play" hidden aria-label="Pause or play video">Pause</button><button class="sound" aria-label="Toggle video sound">Muted</button><button class="fit" aria-label="Show entire image or fill frame">Fill</button><button class="keys" aria-label="Set Reels shortcut">Keys</button><button class="close" aria-label="Close Reels">✕</button></div>
-      <div class="rail"><div class="loaded"><strong class="loaded-total">0</strong>loaded items</div><span class="count"></span><span class="first-item">1</span>
-        <div class="track" role="slider" aria-label="Jump to loaded media" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="1" aria-valuenow="1" aria-disabled="true" tabindex="-1"><span class="thumb"></span></div>
+      <div class="rail"><div class="loaded"><strong class="loaded-total">0</strong>loaded items</div><span class="count"></span><span class="preload-summary"></span><span class="first-item">1</span>
+        <div class="track" role="slider" aria-label="Jump to loaded media" aria-orientation="vertical" aria-valuemin="1" aria-valuemax="1" aria-valuenow="1" aria-disabled="true" tabindex="-1"><div class="markers" aria-hidden="true"></div><span class="thumb"></span></div>
         <span class="last-item">—</span><div class="arrows"><button class="prev" aria-label="Previous media">↑</button><button class="next" aria-label="Next media">↓</button></div></div>
       <div class="actions"><button class="like" aria-label="Like current post" title="L: like (does not unlike)">♡ Like · L</button><button class="bookmark" aria-label="Bookmark current post" title="B: bookmark (does not remove)">Bookmark · B</button></div>
     </div>`;
