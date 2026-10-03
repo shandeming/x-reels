@@ -1,0 +1,71 @@
+X Reels v1.4 — one photo or video per screen
+
+ONE-TIME SETUP IN EDGE
+1. Open Tampermonkey > Dashboard > + (Create a new script).
+2. Replace the sample code with everything from x-reels.user.js, then press Ctrl+S.
+3. Refresh your X Home tab and click the black "Reels" button.
+
+AFTER SETUP
+Scroll down/up, swipe, or use the arrow keys to move to the next/previous media.
+There is no scroll cooldown. Faster/larger wheel movements move through more
+items, and trackpad input accumulates. One 100-pixel wheel step = one item.
+Text-only posts and captions are omitted. Videos loop and start muted.
+Images and videos now fit the full available screen width and height,
+preserving their aspect ratio. Landscape images no longer use a narrow
+portrait column. Fit is the default; the Fill button switches to cropping.
+The right navigation bar shows the loaded media total and current position.
+Click the bar or drag its thumb to jump to any loaded item. Photos and
+videos each count as one item, including separate photos in a multi-photo
+post. The total grows as X loads more items. The bar covers loaded items,
+not every post that might exist on X. With the bar focused, Home/End jump
+to the first/last item; Page Up/Down move 10 items; arrows move one item.
+Click any photo/video to open its original post in a new tab. Press P or use
+the Pause/Play button to pause/play a video. "Muted" turns sound on.
+Alt+Shift+R enters/exits Reels mode. To set another shortcut, click Keys and
+press a combination containing Ctrl or Alt. Outside Reels, right-click the
+Reels button to change it. The shortcut is remembered and is ignored while
+typing in a text field. Avoid combinations already used by your browser.
+L likes the current media's original post. B adds it to your bookmarks.
+The bottom-left buttons do the same. These shortcuts only ADD; pressing
+again does not unlike or remove a bookmark. They are ignored while typing
+or when held down. A message confirms the post ID and outcome.
+
+Like/bookmark now stays in the background. For a loaded post, it uses X's
+native button; for an unloaded post, it sends a request to the same-origin
+X API using your existing session. It never opens a tab for these actions.
+Session headers are captured from X's own requests and kept only in memory;
+they are not saved or exported. Refresh X after installing this update so
+the script can observe the signed-in session requests.
+Background writes are sent only after you press L/B or their buttons.
+The script checks the response before reporting success. If a request
+fails or times out, check the original post before trying again; the script
+does not automatically retry writes. It never acts simply by viewing media.
+Press Escape or click X to return to normal X. Opening Reels is remembered
+for your next page load. Disable the script in Tampermonkey to remove it.
+
+If Tampermonkey reports that userscripts are blocked, follow its displayed
+instructions for allowing userscripts in Edge. Disable Twitter Media Only
+Toggle to avoid conflicts.
+
+UPDATING FROM AN EARLIER VERSION
+Edit the existing X Reels script in Tampermonkey, replace all its code with
+x-reels.user.js, press Ctrl+S, and refresh X. Do not install a second copy.
+
+LIMITS
+This is a custom prototype, not an official X feature or Instagram clone.
+Fast scrolling, post links, autoplay, and shortcuts were verified in a local
+browser with synthetic timeline data and a playable video. Like/bookmark
+tests used simulated native buttons and a mock X API, including successful
+responses, missing session headers, duplicate presses, rate limits, API
+errors, unexpected responses, and network failure. They do not prove X
+server acceptance on your account. The updated version has not been
+verified on your signed-in X account. Background actions use X's internal
+GraphQL operations; X may change the endpoint IDs or required headers.
+The script learns newer action IDs if X makes those requests on the page.
+It also depends on X's
+current timeline response format, which may change. It reads media URLs
+from timeline responses X already loads, and scrolls the original feed
+behind the viewer to load more. It does not send posts or account details
+to another service. Viewing videos/images still makes normal media requests
+to X's media servers. Search, account or sensitive-content restrictions
+still apply; there may be a wait when X has not loaded the next item.
